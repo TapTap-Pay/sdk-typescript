@@ -1,0 +1,50 @@
+{
+  "name": "@taptap-pay/sdk",
+  "version": "0.0.0",
+  "description": "Official TypeScript SDK for the TapTap-Pay API",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/TapTap-Pay/sdk-typescript.git"
+  },
+  "homepage": "https://taptap.rs",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./gen/*": {
+      "types": "./dist/gen/*.d.ts",
+      "import": "./dist/gen/*.js"
+    }
+  },
+  "files": [
+    "dist/",
+    "src/",
+    "gen/",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com/"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "node --test --import tsx src/**/*.test.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.8.3"
+  },
+  "dependencies": {
+    "@bufbuild/protobuf": "^2.10.2",
+    "@bufbuild/protovalidate": "^1.1.0",
+    "@connectrpc/connect": "^2.1.1",
+    "@connectrpc/connect-web": "^2.1.1"
+  }
+}
