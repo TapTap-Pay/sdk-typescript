@@ -1,8 +1,8 @@
 // Public surface of @taptap-pay/sdk. Generated proto messages are
 // re-exported under the `./gen/*` subpath via package.json `exports`.
 
-export { TapTap, DEFAULT_BASE_URL } from "./client.js";
-export type { TapTapOptions } from "./client.js";
+export { TapTap, PROD_BASE_URL, SANDBOX_BASE_URL } from "./client.js";
+export type { TapTapOptions, TapTapMode } from "./client.js";
 
 export {
   isNotFound,

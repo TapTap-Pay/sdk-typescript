@@ -15,13 +15,18 @@ import { WebhooksService } from "../gen/v1/programmatic/webhooks/webhooks_pb.js"
 import { authInterceptor, userAgentInterceptor } from "./auth.js";
 import { retryInterceptor } from "./retry.js";
 
-/** Production TapTap-Pay API endpoint. */
-export const DEFAULT_BASE_URL = "https://api.taptap.rs";
+// Environment URLs. CI rewrites these from secrets at release time.
+export const PROD_BASE_URL = "https://api.taptap.rs";
+export const SANDBOX_BASE_URL = "https://api.usetaptap.dev";
+
+export type TapTapMode = "production" | "sandbox";
 
 export interface TapTapOptions {
-  /** Secret API key (sk_test_… or sk_live_…). Required. */
+  /** Secret API key. Required. */
   apiKey: string;
-  /** Override the API base URL. Defaults to production. */
+  /** "production" (default) or "sandbox". Ignored when baseUrl is set. */
+  mode?: TapTapMode;
+  /** Explicit override — ignores mode when set. */
   baseUrl?: string;
   /**
    * Cap automatic retries on transient errors (Unavailable,
@@ -73,7 +78,7 @@ export class TapTap {
     }
 
     const transport = createConnectTransport({
-      baseUrl: opts.baseUrl ?? DEFAULT_BASE_URL,
+      baseUrl: opts.baseUrl ?? (opts.mode === "sandbox" ? SANDBOX_BASE_URL : PROD_BASE_URL),
       fetch: opts.fetch,
       interceptors: [
         userAgentInterceptor(opts.userAgent),
