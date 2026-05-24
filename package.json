@@ -1,6 +1,6 @@
 {
   "name": "@taptap-pay/sdk",
-  "version": "0.0.47",
+  "version": "0.0.48",
   "description": "Official TypeScript SDK for the TapTap-Pay API",
   "license": "Apache-2.0",
   "repository": {
