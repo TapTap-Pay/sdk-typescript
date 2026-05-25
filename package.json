@@ -1,13 +1,13 @@
 {
   "name": "@taptap-pay/sdk",
-  "version": "0.0.48",
+  "version": "0.0.0",
   "description": "Official TypeScript SDK for the TapTap-Pay API",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
     "url": "https://github.com/TapTap-Pay/sdk-typescript.git"
   },
-  "homepage": "https://taptap.rs",
+  "homepage": "https://usetaptap.com",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

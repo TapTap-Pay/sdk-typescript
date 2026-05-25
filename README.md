@@ -2,7 +2,7 @@
 
 [![License](https://img.shields.io/badge/license-Apache_2.0-blue.svg)](LICENSE)
 
-The official TypeScript SDK for the [TapTap-Pay](https://taptap.rs) API.
+The official TypeScript SDK for the [TapTap-Pay](https://usetaptap.com) API.
 
 Wraps the generated [Connect-ES](https://connectrpc.com/) clients with
 API-key authentication, transient-error retries with exponential
@@ -48,7 +48,7 @@ console.log(link?.id);
 
 ## Authentication
 
-API keys are minted in the [dashboard](https://app.taptap.rs). Sandbox
+API keys are minted in the [dashboard](https://app.usetaptap.com). Sandbox
 keys are prefixed `sk_test_`, live keys `sk_live_`. The SDK sends them
 as `Authorization: Bearer <key>` on every request.
 
@@ -57,7 +57,7 @@ as `Authorization: Bearer <key>` on every request.
 ```ts
 const client = new TapTap({
   apiKey: "sk_live_...",            // required
-  baseUrl: "https://api.taptap.rs", // optional override
+  baseUrl: "https://api.usetaptap.com", // optional override
   maxRetries: 3,                    // default 3
   retryBaseDelayMs: 500,            // default 500ms
   userAgent: "my-app/1.4.0",        // optional, appended to SDK UA

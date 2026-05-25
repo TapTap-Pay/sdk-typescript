@@ -1,40 +1,88 @@
 name: Release
 
-# Triggered by the cross-repo push from TapTap-Pay/api's release-sdks
-# workflow: api tags itself e.g. "0.0.33" → release-sdks pushes the
-# same numeric tag onto this repo (no v prefix, matches npm semver) →
-# this workflow builds and publishes @taptap-pay/sdk to GitHub Packages.
+# Triggered on push to main when the commit message contains a semver
+# bump keyword (#patch, #minor, #major). Computes the next version from
+# the repo's own tags (independent of the API version), bumps
+# package.json + version.ts, verifies, tags, publishes to GitHub
+# Packages, and cuts a GitHub Release.
 
 on:
   push:
-    tags:
-      - '[0-9]+.[0-9]+.[0-9]+'
+    branches: [main]
 
 jobs:
-  publish:
-    name: Build + publish to GitHub Packages
+  release:
+    name: Tag and release
     runs-on: ubuntu-latest
+    if: >-
+      contains(github.event.head_commit.message, '#patch') ||
+      contains(github.event.head_commit.message, '#minor') ||
+      contains(github.event.head_commit.message, '#major')
     permissions:
       contents: write
       packages: write
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - uses: actions/setup-node@v4
+      - name: Determine bump type
+        id: bump
+        run: |
+          MSG='${{ github.event.head_commit.message }}'
+          if [[ "$MSG" == *"#major"* ]]; then
+            echo "type=major" >> "$GITHUB_OUTPUT"
+          elif [[ "$MSG" == *"#minor"* ]]; then
+            echo "type=minor" >> "$GITHUB_OUTPUT"
+          else
+            echo "type=patch" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Compute next version
+        id: version
+        run: |
+          set -euo pipefail
+          LATEST=$(git tag --list --sort=-v:refname '[0-9]*.[0-9]*.[0-9]*' | head -1)
+          LATEST=${LATEST:-0.0.0}
+          IFS='.' read -r major minor patch <<< "$LATEST"
+          case "${{ steps.bump.outputs.type }}" in
+            patch) patch=$((patch + 1)) ;;
+            minor) minor=$((minor + 1)); patch=0 ;;
+            major) major=$((major + 1)); minor=0; patch=0 ;;
+          esac
+          echo "tag=${major}.${minor}.${patch}" >> "$GITHUB_OUTPUT"
+          echo "Next version: ${major}.${minor}.${patch}"
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
         with:
           node-version: '20'
           registry-url: 'https://npm.pkg.github.com'
           scope: '@taptap-pay'
 
-      - run: npm ci
+      - name: Bump version
+        run: node bump.js "${{ steps.version.outputs.tag }}"
 
-      - name: Typecheck
-        run: npx tsc --noEmit
+      - name: Install and verify
+        run: |
+          npm ci
+          npx tsc --noEmit
+          npm run build
 
-      - name: Build
-        run: npm run build
+      - name: Commit, tag, push
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if ! git diff --staged --quiet; then
+            git commit -m "chore: release ${{ steps.version.outputs.tag }}"
+          fi
+          git tag -a "${{ steps.version.outputs.tag }}" -m "${{ steps.version.outputs.tag }}"
+          git push origin main --tags
 
-      - name: Publish
+      - name: Publish to GitHub Packages
         run: npm publish --no-git-checks
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -43,6 +91,6 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release create "${GITHUB_REF_NAME}" \
-            --title "${GITHUB_REF_NAME}" \
+          gh release create "${{ steps.version.outputs.tag }}" \
+            --title "${{ steps.version.outputs.tag }}" \
             --generate-notes

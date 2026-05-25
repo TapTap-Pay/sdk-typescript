@@ -16,7 +16,7 @@ import { authInterceptor, userAgentInterceptor } from "./auth.js";
 import { retryInterceptor } from "./retry.js";
 
 // Environment URLs. CI rewrites these from secrets at release time.
-export const PROD_BASE_URL = "https://api.taptap.rs";
+export const PROD_BASE_URL = "https://api.usetaptap.com";
 export const SANDBOX_BASE_URL = "https://api.usetaptap.dev";
 
 export type TapTapMode = "production" | "sandbox";
