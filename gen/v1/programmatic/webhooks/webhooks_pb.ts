@@ -61,7 +61,7 @@ export type CreateWebhookResponse = Message<"programmatic.webhooks.v1.CreateWebh
 
   /**
    * HMAC-SHA256 signing secret. Returned **exactly once** — store it on
-   * your side and validate the `X-TapTap-Signature` header on every
+   * your side and validate the `X-Webhook-Signature-V2` header on every
    * delivery.
    *
    * @generated from field: string secret = 2;
