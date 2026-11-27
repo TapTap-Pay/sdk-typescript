@@ -34,7 +34,7 @@
   },
   "scripts": {
     "build": "tsc",
-    "test": "node --test --import tsx src/**/*.test.ts"
+    "test": "node --test --import tsx src/*.test.ts"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",

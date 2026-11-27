@@ -1,16 +1,17 @@
 import { createClient, type Client } from "@connectrpc/connect";
 import { createConnectTransport } from "@connectrpc/connect-web";
 
-import { InvoicesService } from "../gen/v1/programmatic/invoices/invoices_pb.js";
-import { PayInsService } from "../gen/v1/programmatic/payins/payins_pb.js";
-import { PaymentLinksService } from "../gen/v1/programmatic/payment_links/payment_links_pb.js";
-import { PaymentsService } from "../gen/v1/programmatic/payments/payments_pb.js";
-import { PayOutsService } from "../gen/v1/programmatic/payouts/payouts_pb.js";
-import { RefundsService } from "../gen/v1/programmatic/refunds/refunds_pb.js";
-import { TransactionsService } from "../gen/v1/programmatic/transactions/transactions_pb.js";
-import { TransfersService } from "../gen/v1/programmatic/transfers/transfers_pb.js";
-import { WalletsService } from "../gen/v1/programmatic/wallets/wallets_pb.js";
-import { WebhooksService } from "../gen/v1/programmatic/webhooks/webhooks_pb.js";
+import { BankingService } from "../gen/taptap/banking/programmatic/v1/banking_service_pb.js";
+import { WebhookService } from "../gen/taptap/developer/programmatic/v1/webhook_service_pb.js";
+import { InboundDocumentService } from "../gen/taptap/invoicing/programmatic/v1/inbound_document_service_pb.js";
+import { InvoiceService } from "../gen/taptap/invoicing/programmatic/v1/invoice_service_pb.js";
+import { SubvendorService } from "../gen/taptap/marketplace/programmatic/v1/subvendor_service_pb.js";
+import { CustomerService } from "../gen/taptap/payment/programmatic/v1/customer_service_pb.js";
+import { PaymentLinkService } from "../gen/taptap/payment/programmatic/v1/payment_link_service_pb.js";
+import { PaymentService } from "../gen/taptap/payment/programmatic/v1/payment_service_pb.js";
+import { RefundService } from "../gen/taptap/payment/programmatic/v1/refund_service_pb.js";
+import { TransactionService } from "../gen/taptap/payment/programmatic/v1/transaction_service_pb.js";
+import { WalletService } from "../gen/taptap/payment/programmatic/v1/wallet_service_pb.js";
 
 import { authInterceptor, userAgentInterceptor } from "./auth.js";
 import { retryInterceptor } from "./retry.js";
@@ -52,25 +53,30 @@ export interface TapTapOptions {
  * Entry point for the TapTap-Pay SDK. Construct once and reuse — the
  * per-service sub-clients are safe for concurrent use.
  *
+ * Every request names the vendor the API key belongs to in `vendorId`
+ * (`ven_` followed by a UUID). The SDK does not fill it in.
+ *
  * @example
- * const client = new TapTap({ apiKey: process.env.TAPTAP_SECRET! });
- * const { link } = await client.paymentLinks.createPaymentLink({
+ * const client = new TapTap({ apiKey: process.env.TAPTAP_API_KEY! });
+ * const { paymentLink } = await client.paymentLinks.createPaymentLink({
+ *   vendorId: process.env.TAPTAP_VENDOR_ID!,
  *   title: "Premium plan",
- *   amount: { amountMinor: 2999n, currency: "EUR" },
- *   targetWalletId: walletId,
+ *   amount: { currency: "EUR", amountMinor: 2999n },
+ *   usage: { usage: { case: "unlimited", value: true } },
  * });
  */
 export class TapTap {
-  readonly invoices: Client<typeof InvoicesService>;
-  readonly payIns: Client<typeof PayInsService>;
-  readonly paymentLinks: Client<typeof PaymentLinksService>;
-  readonly payments: Client<typeof PaymentsService>;
-  readonly payOuts: Client<typeof PayOutsService>;
-  readonly refunds: Client<typeof RefundsService>;
-  readonly transactions: Client<typeof TransactionsService>;
-  readonly transfers: Client<typeof TransfersService>;
-  readonly wallets: Client<typeof WalletsService>;
-  readonly webhooks: Client<typeof WebhooksService>;
+  readonly banking: Client<typeof BankingService>;
+  readonly customers: Client<typeof CustomerService>;
+  readonly inboundDocuments: Client<typeof InboundDocumentService>;
+  readonly invoices: Client<typeof InvoiceService>;
+  readonly paymentLinks: Client<typeof PaymentLinkService>;
+  readonly payments: Client<typeof PaymentService>;
+  readonly refunds: Client<typeof RefundService>;
+  readonly subvendors: Client<typeof SubvendorService>;
+  readonly transactions: Client<typeof TransactionService>;
+  readonly wallets: Client<typeof WalletService>;
+  readonly webhooks: Client<typeof WebhookService>;
 
   constructor(opts: TapTapOptions) {
     if (!opts.apiKey) {
@@ -87,15 +93,16 @@ export class TapTap {
       ],
     });
 
-    this.invoices = createClient(InvoicesService, transport);
-    this.payIns = createClient(PayInsService, transport);
-    this.paymentLinks = createClient(PaymentLinksService, transport);
-    this.payments = createClient(PaymentsService, transport);
-    this.payOuts = createClient(PayOutsService, transport);
-    this.refunds = createClient(RefundsService, transport);
-    this.transactions = createClient(TransactionsService, transport);
-    this.transfers = createClient(TransfersService, transport);
-    this.wallets = createClient(WalletsService, transport);
-    this.webhooks = createClient(WebhooksService, transport);
+    this.banking = createClient(BankingService, transport);
+    this.customers = createClient(CustomerService, transport);
+    this.inboundDocuments = createClient(InboundDocumentService, transport);
+    this.invoices = createClient(InvoiceService, transport);
+    this.paymentLinks = createClient(PaymentLinkService, transport);
+    this.payments = createClient(PaymentService, transport);
+    this.refunds = createClient(RefundService, transport);
+    this.subvendors = createClient(SubvendorService, transport);
+    this.transactions = createClient(TransactionService, transport);
+    this.wallets = createClient(WalletService, transport);
+    this.webhooks = createClient(WebhookService, transport);
   }
 }

@@ -12,8 +12,12 @@ export {
   isUnauthenticated,
   isRateLimited,
   isFailedPrecondition,
+  isAborted,
+  errorInfo,
+  errorCode,
   newIdempotencyKey,
 } from "./errors.js";
+export type { ErrorInfo } from "../gen/taptap/common/v1/error_pb.js";
 
 export { iter, items } from "./pagination.js";
 export type { Page, FetchPageFn } from "./pagination.js";

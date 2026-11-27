@@ -1,38 +1,47 @@
-import type { PaginatedResponseMeta } from "../gen/v1/common/response_pb.js";
-
-/** One page of items returned by a List endpoint plus the meta. */
+/**
+ * One page of items returned by a List endpoint plus the cursor the
+ * server returned for the page after it (empty on the last page).
+ */
 export interface Page<T> {
   items: T[];
-  meta: PaginatedResponseMeta | undefined;
+  nextPageToken: string;
 }
 
 /**
- * Per-page callback supplied to `iter`. Receives a 1-indexed page
- * number and returns items + meta.
+ * Per-page callback supplied to `iter`. Receives the cursor of the page
+ * to fetch (empty for the first page) and returns the items plus the
+ * cursor of the next page, empty when there are no more.
+ *
+ * The cursor is spelled differently across the List endpoints, which is
+ * why the callback does the mapping: most requests take `pageToken` and
+ * answer `nextPageToken`; `listInvoices` and `listInboundDocuments` take
+ * `cursor` and answer `nextCursor`; `listSubvendors` takes
+ * `page: { pageToken }` and answers `page?.nextPageToken`.
  */
-export type FetchPageFn<T> = (page: number) => Promise<{
+export type FetchPageFn<T> = (pageToken: string) => Promise<{
   items: T[];
-  meta: PaginatedResponseMeta | undefined;
+  nextPageToken: string | undefined;
 }>;
 
 /**
  * Walks every page of a List endpoint, surfacing one Page at a time.
  *
  * @example
- * for await (const page of iter((p) =>
- *   client.paymentLinks.listPaymentLinks({ pagination: { page: p, pageSize: 100n } })
- *     .then(r => ({ items: r.links, meta: r.meta }))
+ * for await (const page of iter((pageToken) =>
+ *   client.paymentLinks.listPaymentLinks({ vendorId, pageSize: 100, pageToken })
+ *     .then(r => ({ items: r.paymentLinks, nextPageToken: r.nextPageToken }))
  * )) {
  *   for (const link of page.items) console.log(link.id);
  * }
  */
 export async function* iter<T>(fetch: FetchPageFn<T>): AsyncGenerator<Page<T>> {
-  let page = 1;
+  let pageToken = "";
   while (true) {
-    const { items, meta } = await fetch(page);
-    yield { items, meta };
-    if (!meta || page >= meta.totalPages) return;
-    page++;
+    const { items, nextPageToken } = await fetch(pageToken);
+    const next = nextPageToken ?? "";
+    yield { items, nextPageToken: next };
+    if (next === "") return;
+    pageToken = next;
   }
 }
 
