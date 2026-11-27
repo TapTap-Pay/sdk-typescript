@@ -10,8 +10,9 @@ backoff + jitter, typed error guards, and an async-iterator pagination
 helper. Works in modern Node.js (18+, native `fetch`), browsers,
 Bun, Deno, and Cloudflare Workers.
 
-The SDK exposes only the `programmatic/*` API surface — the API-key
-authenticated endpoints meant for server-to-server integrations.
+The SDK exposes only the programmatic API surface (the
+`taptap.<context>.programmatic.v1` packages) — the API-key authenticated
+endpoints meant for server-to-server integrations.
 
 ## Install
 
@@ -35,28 +36,59 @@ Requires Node.js 18+ (or any runtime with native `fetch`).
 ```ts
 import { TapTap } from "@taptap-pay/sdk";
 
-const client = new TapTap({ apiKey: process.env.TAPTAP_SECRET! });
+const client = new TapTap({ apiKey: process.env.TAPTAP_API_KEY! });
 
-const { link } = await client.paymentLinks.createPaymentLink({
+const { paymentLink } = await client.paymentLinks.createPaymentLink({
+  vendorId: process.env.TAPTAP_VENDOR_ID!,
   title: "Premium plan",
-  amount: { amountMinor: 2999n, currency: "EUR" },
-  targetWalletId: process.env.TAPTAP_WALLET_ID!,
+  amount: { currency: "EUR", amountMinor: 2999n },
+  usage: { usage: { case: "unlimited", value: true } },
 });
 
-console.log(link?.id);
+console.log(paymentLink?.id);
 ```
+
+Amounts in minor units are `bigint` values (the `n` suffix).
+
+## Services
+
+| Client property | Service | Module under `@taptap-pay/sdk/gen/taptap/` |
+|---|---|---|
+| `banking` | `BankingService` | `banking/programmatic/v1/banking_service_pb` |
+| `customers` | `CustomerService` | `payment/programmatic/v1/customer_service_pb` |
+| `inboundDocuments` | `InboundDocumentService` | `invoicing/programmatic/v1/inbound_document_service_pb` |
+| `invoices` | `InvoiceService` | `invoicing/programmatic/v1/invoice_service_pb` |
+| `paymentLinks` | `PaymentLinkService` | `payment/programmatic/v1/payment_link_service_pb` |
+| `payments` | `PaymentService` | `payment/programmatic/v1/payment_service_pb` |
+| `refunds` | `RefundService` | `payment/programmatic/v1/refund_service_pb` |
+| `subvendors` | `SubvendorService` | `marketplace/programmatic/v1/subvendor_service_pb` |
+| `transactions` | `TransactionService` | `payment/programmatic/v1/transaction_service_pb` |
+| `wallets` | `WalletService` | `payment/programmatic/v1/wallet_service_pb` |
+| `webhooks` | `WebhookService` | `developer/programmatic/v1/webhook_service_pb` |
+
+Enums and message schemas are imported from those modules, for example
+`import { PaymentPurpose } from "@taptap-pay/sdk/gen/taptap/payment/programmatic/v1/payment_service_pb"`.
 
 ## Authentication
 
-API keys are minted in the [dashboard](https://app.usetaptap.com). Sandbox
-keys are prefixed `sk_test_`, live keys `sk_live_`. The SDK sends them
-as `Authorization: Bearer <key>` on every request.
+API keys are minted in the [dashboard](https://app.usetaptap.com), in your
+vendor's settings under API keys. A key looks like `taptap_live_` followed
+by a lookup part, a dot and a secret part. The SDK sends it as
+`Authorization: Bearer <key>` on every request.
+
+## Vendor id
+
+A key belongs to one vendor, and every request names that vendor in its
+`vendorId` field (`ven_` followed by a UUID). The SDK does not fill it in:
+set it on each request. Naming a vendor the key does not belong to is
+answered like a vendor that does not exist (`not_found`, code
+`VENDOR_NOT_FOUND`).
 
 ## Configuration
 
 ```ts
 const client = new TapTap({
-  apiKey: "sk_live_...",            // required
+  apiKey: "taptap_live_...",        // required
   baseUrl: "https://api.usetaptap.com", // optional override
   maxRetries: 3,                    // default 3
   retryBaseDelayMs: 500,            // default 500ms
@@ -67,24 +99,27 @@ const client = new TapTap({
 
 ## Idempotency
 
-Every state-changing RPC accepts an `idempotencyKey` field on its
-request. Send the same key to safely retry a write — the API dedupes
-and returns the original result.
+State-changing RPCs accept an `idempotencyKey` field on their request
+(`refundPayment` calls it `requestKey`). Send the same key to safely
+retry a write — the API dedupes and returns the original result.
 
 ```ts
 import { TapTap, newIdempotencyKey } from "@taptap-pay/sdk";
 
-const client = new TapTap({ apiKey: process.env.TAPTAP_SECRET! });
+const client = new TapTap({ apiKey: process.env.TAPTAP_API_KEY! });
 
 const key = newIdempotencyKey(); // UUID v4 from crypto.randomUUID
-const payment = await client.payments.requestPayment({
+const { payment } = await client.payments.createPayment({
+  vendorId,
   idempotencyKey: key,
   // ...
 });
 ```
 
 The SDK's retry layer re-sends the same request on each attempt, so
-the key is preserved naturally across automatic retries.
+the key is preserved naturally across automatic retries. Reusing a key
+for a request with different content is refused with `aborted` and the
+code `IDEMPOTENCY_KEY_CONFLICT` (`isAborted`).
 
 ## Retries
 
@@ -105,12 +140,15 @@ import {
 } from "@taptap-pay/sdk";
 
 try {
-  const link = await client.paymentLinks.getPaymentLink({ id });
+  const { paymentLink } = await client.paymentLinks.getPaymentLink({
+    vendorId,
+    paymentLinkId,
+  });
 } catch (err) {
   if (isNotFound(err)) {
     // 404
   } else if (isInvalidArgument(err)) {
-    // protovalidate rejected the request
+    // the request was rejected as malformed
   } else if (isRateLimited(err)) {
     // 429 — retry budget exhausted
   } else if (isFailedPrecondition(err)) {
@@ -121,45 +159,78 @@ try {
 }
 ```
 
+Every refusal also carries a `taptap.common.v1.ErrorInfo` detail: a
+stable machine code, the parameters around it, and an English debug
+message. Branch on the code, never on the message:
+
+```ts
+import { errorCode, errorInfo } from "@taptap-pay/sdk";
+
+try {
+  await client.refunds.refundPayment(request);
+} catch (err) {
+  const info = errorInfo(err);
+  console.log(info?.code, info?.params); // e.g. REFUND_EXCEEDS_REMAINDER
+  if (errorCode(err) !== "REFUND_EXCEEDS_REMAINDER") throw err;
+}
+```
+
 The raw `ConnectError` is reachable directly — every guard checks
 `err instanceof ConnectError` under the hood.
 
 ## Pagination
 
-List endpoints return one page at a time. Use the SDK's async iterator
-to walk every page or every item lazily:
+List endpoints return one page at a time and a cursor for the next. Use
+the SDK's async iterator to walk every page or every item lazily. The
+callback receives the cursor (empty for the first page) and returns the
+items and the next cursor:
 
 ```ts
 import { TapTap, iter, items } from "@taptap-pay/sdk";
 
-const client = new TapTap({ apiKey: process.env.TAPTAP_SECRET! });
+const client = new TapTap({ apiKey: process.env.TAPTAP_API_KEY! });
 
 for await (const link of items(
-  iter(async (page) => {
+  iter(async (pageToken) => {
     const res = await client.paymentLinks.listPaymentLinks({
-      pagination: { page, pageSize: 100 },
+      vendorId,
+      pageSize: 100,
+      pageToken,
     });
-    return { items: res.links, meta: res.meta };
+    return { items: res.paymentLinks, nextPageToken: res.nextPageToken };
   }),
 )) {
   console.log(link.id);
 }
 ```
 
+The cursor is spelled three ways across the API, and the callback is
+where you map it:
+
+| Lists | Request | Response |
+|---|---|---|
+| Most (`listPayments`, `listPaymentLinks`, `listRefunds`, `listCustomers`, `listUnappliedReceipts`, `listWalletTransactions`, `listBankTransfers`, `listSubscriptions`, `listDeliveries`) | `pageToken` | `nextPageToken` |
+| `listInvoices`, `listInboundDocuments` | `cursor` | `nextCursor` |
+| `listSubvendors` | `page: { pageToken }` | `page?.nextPageToken` |
+
+`listWallets` returns every wallet in one response.
+
 ## Versioning
 
-Releases follow the upstream [TapTap-Pay API](https://github.com/TapTap-Pay/api)
-tag exactly — `0.0.32` of the API ships as `0.0.32` of every SDK.
-Generated code is regenerated and pushed on each API release; the
-hand-written ergonomics layer is left untouched.
+This package has its own semver versions. After each release of the
+[TapTap-Pay monorepo](https://github.com/TapTap-Pay/monorepo), `gen/` is
+regenerated from its programmatic protos and pushed here, which cuts the
+next SDK release.
 
 ## Contributing
 
 The generated code in `gen/` is overwritten by CI on every release.
-Don't hand-edit it — change the source `.proto` in the
-[`api`](https://github.com/TapTap-Pay/api) repo instead.
+Don't hand-edit it — change the source `.proto` under
+`proto/taptap/*/programmatic/` in the
+[`monorepo`](https://github.com/TapTap-Pay/monorepo) instead.
 
 Hand-written ergonomics (everything in `src/`) is fair game for PRs.
+Run the tests with `npm test`.
 
 ## License
 
