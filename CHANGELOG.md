@@ -26,3 +26,10 @@ its releases.
 - `errorInfo` and `errorCode` decode the `taptap.common.v1.ErrorInfo`
   detail attached to every refusal.
 - `isAborted`, for an idempotency key reused with different content.
+
+### Fixed
+
+- `import { TapTap } from "@taptap-pay/sdk"` resolves: `main`, `types` and
+  the root export point at `dist/src/index.js`, where `tsc` emits it.
+- Generated modules under `@taptap-pay/sdk/gen/` can be imported with or
+  without a `.js` suffix.
